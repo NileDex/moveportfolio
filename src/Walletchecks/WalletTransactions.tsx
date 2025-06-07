@@ -3,7 +3,6 @@ import { useAccount } from '@razorlabs/razorkit';
 import { Aptos, Network, AptosConfig } from '@aptos-labs/ts-sdk';
 import { FaSpinner } from 'react-icons/fa';
 import Penguin from '../assets/Penguin.png';
-import DashboardHeader from '../components/DashboardHeader';
 
 interface Transaction {
   version: string;
@@ -28,11 +27,9 @@ export default function WalletTransactions({ walletAddress: propWalletAddress }:
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [savedAddresses, setSavedAddresses] = useState<string[]>([]);
-  const [walletAddress, setWalletAddress] = useState<string>(propWalletAddress || connectedAddress || '');
+  const [walletAddress] = useState<string>(propWalletAddress || connectedAddress || '');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const aptosConfig = new AptosConfig({
     fullnode: 'https://mainnet.movementnetwork.xyz/v1',
@@ -193,28 +190,8 @@ export default function WalletTransactions({ walletAddress: propWalletAddress }:
     }
   };
 
-  const handleRefresh = async () => {
-    if (isRefreshing) return;
-    setIsRefreshing(true);
-    try {
-      await fetchTransactions(currentPage);
-    } finally {
-      setTimeout(() => setIsRefreshing(false), 1000);
-    }
-  };
-
-  const handleAddressRemove = (index: number) => {
-    const newAddresses = savedAddresses.filter((_, i) => i !== index);
-    setSavedAddresses(newAddresses);
-    if (walletAddress === savedAddresses[index]) {
-      setWalletAddress(newAddresses[0] || '');
-    }
-  };
-
   return (
     <div className="profiz-transaction-hub">
-   
-
       <div className="transactions-container">
         <div className="transactions-header">
           <div className="wallet-address-display">

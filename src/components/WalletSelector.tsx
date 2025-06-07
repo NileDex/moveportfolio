@@ -1,5 +1,3 @@
-// WalletSelector.tsx
-import React from 'react';
 import { WalletProvider, ConnectButton, ErrorCode, BaseError } from "@razorlabs/razorkit";
 
 export function WalletSelector() {
