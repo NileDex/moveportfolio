@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useAccount } from '@razorlabs/razorkit';
 import { Aptos, Network, AptosConfig } from '@aptos-labs/ts-sdk';
 import { FaSpinner } from 'react-icons/fa';
-import Penguin from '../assets/Penguin.png';
 
 interface Transaction {
   version: string;
@@ -212,7 +211,6 @@ export default function WalletTransactions({ walletAddress: propWalletAddress }:
           </div>
         ) : error ? (
           <div className="transactions-error">
-            <img src={Penguin} alt="Error" className="error-image" />
             <p className="error-message">{error}</p>
             <button className="retry-button" onClick={() => fetchTransactions(currentPage)}>
               Try Again
@@ -220,7 +218,6 @@ export default function WalletTransactions({ walletAddress: propWalletAddress }:
           </div>
         ) : transactions.length === 0 ? (
           <div className="no-transactions">
-            <img src={Penguin} alt="No transactions" className="no-transactions-image" />
             <p>No transactions found for this wallet</p>
           </div>
         ) : (
