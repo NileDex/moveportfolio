@@ -224,6 +224,7 @@ export default function AccountInfoCard({
         <div className="account-header-details">
           <div className="account-address">{formattedAddress}</div>
           <button className="disconnect-button" onClick={handleDisconnect}>
+            Disconnect
             <FaPlug size={16} />
           </button>
         </div>
