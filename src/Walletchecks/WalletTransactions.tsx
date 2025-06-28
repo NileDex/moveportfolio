@@ -104,9 +104,10 @@ export default function WalletTransactions({ walletAddress: propWalletAddress }:
     setError(null);
 
     try {
-      // Verify account existence
+      // Verify account existence and get info
+      let accountInfo;
       try {
-        await aptos.getAccountInfo({ accountAddress: walletAddress });
+        accountInfo = await aptos.getAccountInfo({ accountAddress: walletAddress });
       } catch (error) {
         if ((error as { errorCode?: string }).errorCode === 'account_not_found') {
           setTransactions([]);
@@ -115,20 +116,36 @@ export default function WalletTransactions({ walletAddress: propWalletAddress }:
         }
         throw error;
       }
+      
+      const totalTransactions = Number(accountInfo.sequence_number) || 0;
+      if (totalTransactions === 0) {
+        setTransactions([]);
+        setLoading(false);
+        return;
+      }
+      
+      setTotalPages(Math.ceil(totalTransactions / TRANSACTIONS_PER_PAGE));
+
+      // Calculate offset to get latest transactions.
+      const offset = totalTransactions - page * TRANSACTIONS_PER_PAGE;
+
+      const limit = offset < 0 ? TRANSACTIONS_PER_PAGE + offset : TRANSACTIONS_PER_PAGE;
+      const actualOffset = Math.max(0, offset);
+      
+      if (limit <= 0) {
+          setTransactions([]);
+          setLoading(false);
+          return;
+      }
 
       // Fetch transactions
       const accountTransactions = await aptos.getAccountTransactions({
         accountAddress: walletAddress,
         options: {
-          limit: TRANSACTIONS_PER_PAGE,
-          offset: (page - 1) * TRANSACTIONS_PER_PAGE,
+          limit,
+          offset: actualOffset,
         },
       });
-
-      // Calculate total pages
-      const accountInfo = await aptos.getAccountInfo({ accountAddress: walletAddress });
-      const totalTransactions = Number(accountInfo.sequence_number) || 100;
-      setTotalPages(Math.ceil(totalTransactions / TRANSACTIONS_PER_PAGE));
 
       // Process transactions
       const processedTransactions = accountTransactions.map((tx: any) => {
@@ -149,7 +166,8 @@ export default function WalletTransactions({ walletAddress: propWalletAddress }:
         };
       });
 
-      setTransactions(processedTransactions);
+      // The fetched transactions are the latest, but in ascending order. Reverse them.
+      setTransactions(processedTransactions.reverse());
     } catch (error) {
       console.error('Error fetching transactions:', error);
       setError(
@@ -267,6 +285,12 @@ export default function WalletTransactions({ walletAddress: propWalletAddress }:
 
             <div className="pagination-controls">
               <button
+                onClick={() => handlePageChange(1)}
+                disabled={currentPage === 1}
+              >
+                First
+              </button>
+              <button
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage === 1}
               >
@@ -282,9 +306,8 @@ export default function WalletTransactions({ walletAddress: propWalletAddress }:
               <button
                 onClick={() => handlePageChange(totalPages)}
                 disabled={currentPage === totalPages}
-                className="skip-last"
               >
-                Skip to Last
+                Last
               </button>
             </div>
           </>
