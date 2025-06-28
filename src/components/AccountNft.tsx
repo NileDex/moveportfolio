@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAccount } from "@razorlabs/razorkit";
 import { FiSearch, FiGrid } from 'react-icons/fi';
 import { HiViewGrid, HiViewGridAdd } from 'react-icons/hi';
+import { FaList } from 'react-icons/fa';
 import TokenLogo from '../assets/TokenLogo.png';
 
 interface NftData {
@@ -27,7 +28,7 @@ interface NftOwnership {
   amount: string;
 }
 
-type LayoutSize = 'small' | 'medium' | 'large';
+type LayoutSize = 'small' | 'medium' | 'large' | 'list';
 
 // Global cache for metadata to persist across component remounts
 const globalMetadataCache = new Map<string, Promise<string | null>>();
@@ -337,6 +338,8 @@ const AccountNfts = () => {
         return 'nft-grid nft-grid-small';
       case 'large':
         return 'nft-grid nft-grid-large';
+      case 'list':
+        return 'nft-list';
       default:
         return 'nft-grid nft-grid-medium';
     }
@@ -391,6 +394,13 @@ const AccountNfts = () => {
             >
               <FiGrid className="layout-icon" />
             </button>
+            <button
+              className={`layout-btn ${layoutSize === 'list' ? 'active' : ''}`}
+              onClick={() => setLayoutSize('list')}
+              title="List view"
+            >
+              <FaList className="layout-icon" />
+            </button>
           </div>
         </div>
       </div>
@@ -417,7 +427,7 @@ const AccountNfts = () => {
             const imageUrl = imageUrls.get(tokenId);
             
             return (
-              <div key={`${tokenId}-${index}`} className="nft-card">
+              <div key={`${tokenId}-${index}`} className={layoutSize === 'list' ? 'nft-list-item' : 'nft-card'}>
                 <div className="nft-image-container">
                   <NFTImage
                     nft={nft}
