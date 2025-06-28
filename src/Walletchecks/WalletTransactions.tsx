@@ -285,6 +285,12 @@ export default function WalletTransactions({ walletAddress: propWalletAddress }:
 
             <div className="pagination-controls">
               <button
+                onClick={() => handlePageChange(1)}
+                disabled={currentPage === 1}
+              >
+                First
+              </button>
+              <button
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage === 1}
               >
@@ -300,9 +306,8 @@ export default function WalletTransactions({ walletAddress: propWalletAddress }:
               <button
                 onClick={() => handlePageChange(totalPages)}
                 disabled={currentPage === totalPages}
-                className="skip-last"
               >
-                Skip to Last
+                Last
               </button>
             </div>
           </>
