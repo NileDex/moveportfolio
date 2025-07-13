@@ -1,99 +1,93 @@
 import { useState, useEffect, useRef } from "react";
 import { useWallet } from "@razorlabs/razorkit";
-import { useAccount, useAccountBalance } from "@razorlabs/razorkit";
-import { useNavigate } from "react-router-dom";
-import {
-  FaCoins,
-  FaExchangeAlt,
-  FaArrowUp,
-  FaArrowDown,
-  FaExclamationTriangle
-} from "react-icons/fa";
+import { useAccount } from "@razorlabs/razorkit";
+import { useAnimation, useConditionalAnimation } from "@/contexts/AnimationContext";
+import { fadeIn, staggerFadeIn } from "@/lib/animations";
 
-import '../App.css';
-import CallAction from "./CallAction";
+// Import shadcn/ui components
+import { Button } from "@/components/ui/button";
+import AccountActivityChart from "./charts/AccountActivityChart";
+import NetworkPerformanceChart from "./charts/NetworkPerformanceChart";
+import DeFiDashboard from "./charts/DeFiDashboard";
+import LatestTransactions from "./LatestTransactions";
+import LatestBlocks from "./LatestBlocks";
+import MoveSupplyCard from "./metrics/MoveSupplyCard";
+import NetworkMetricsCard from "./metrics/NetworkMetricsCard";
+import StakeMetricsCard from "./metrics/StakeMetricsCard";
+import CurrentEpochCard from "./metrics/CurrentEpochCard";
+import TopDataTabs from "./tables/TopDataTabs";
 
 
-const LOW_BALANCE_THRESHOLD = 10;
-const MAX_BALANCE_FOR_PROGRESS = 100;
 
 export default function Dashboard() {
   const { connected } = useWallet();
-  const navigate = useNavigate();
   const { isConnected, isConnecting } = useAccount();
-  const { loading: balanceLoading, balance } = useAccountBalance();
   const [isCheckingConnection, setIsCheckingConnection] = useState(true);
-  const [showUSD, setShowUSD] = useState(() => {
-    const savedPref = localStorage.getItem("currencyDisplay");
-    return savedPref ? savedPref === "USD" : false;
-  });
-  const [movePrice, setMovePrice] = useState<number | null>(null);
-  const [priceChange, setPriceChange] = useState<number | null>(null);
-  const riskCardRef = useRef<HTMLDivElement>(null);
 
-  const formatBalance = (rawBalance: number | undefined): number => {
-    if (rawBalance === undefined) return 0;
-    return Number(rawBalance) / 100000000;
-  };
+  // Animation refs and hooks
+  const containerRef = useRef<HTMLDivElement>(null);
+  const metricsRef = useRef<HTMLDivElement>(null);
+  const chartsRef = useRef<HTMLDivElement>(null);
+  const tablesRef = useRef<HTMLDivElement>(null);
 
-  const calculateMoveProgress = () => {
-    const moveBalance = formatBalance(Number(balance));
-    if (moveBalance <= 0) return 0;
-    const progress = (moveBalance / MAX_BALANCE_FOR_PROGRESS) * 100;
-    return Math.min(progress, 100);
-  };
-
-  useEffect(() => {
-    const fetchMovePrice = async () => {
-      try {
-        const response = await fetch(
-          "https://api.coingecko.com/api/v3/simple/price?ids=movement&vs_currencies=usd&include_24hr_change=true"
-        );
-        const data = await response.json();
-        setMovePrice(data.movement?.usd || null);
-        setPriceChange(data.movement?.usd_24h_change || null);
-      } catch (error) {
-        console.error("Error fetching MOVE price:", error);
-      }
-    };
-
-    fetchMovePrice();
-    const interval = setInterval(fetchMovePrice, 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    const progress = calculateMoveProgress();
-    if (riskCardRef.current) {
-      riskCardRef.current.style.setProperty('--progress-percent', `${progress}%`);
-    }
-  }, [balance]);
+  const { isAnimationEnabled } = useAnimation();
+  const { shouldAnimate, shouldUseStagger } = useConditionalAnimation();
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsCheckingConnection(false);
-    }, 3000);
-  
-    if (!connected && !isConnected && !isConnecting) {
-      navigate("/");
-    } else if (connected || isConnected) {
+    }, 2000);
+
+    if (connected && isConnected) {
       setIsCheckingConnection(false);
       clearTimeout(timer);
     }
-  
-    return () => clearTimeout(timer);
-  }, [connected, isConnected, isConnecting, navigate]);
 
-  const toggleCurrencyDisplay = () => {
-    const newValue = !showUSD;
-    setShowUSD(newValue);
-    localStorage.setItem("currencyDisplay", newValue ? "USD" : "MOVE");
-  };
+    return () => clearTimeout(timer);
+  }, [connected, isConnected, isConnecting]);
+
+  // Animation effects
+  useEffect(() => {
+    if (!shouldAnimate || !connected || !isConnected) return;
+
+    const animateElements = () => {
+      // Animate container
+      if (containerRef.current) {
+        fadeIn(containerRef.current, { delay: 0.1 });
+      }
+
+      // Animate metrics cards with stagger
+      if (metricsRef.current && shouldUseStagger) {
+        const cards = metricsRef.current.querySelectorAll('.metric-card');
+        if (cards.length > 0) {
+          staggerFadeIn(Array.from(cards), { stagger: 0.1 });
+        }
+      }
+
+      // Animate charts section
+      if (chartsRef.current) {
+        fadeIn(chartsRef.current, { delay: 0.3 });
+      }
+
+      // Animate tables section
+      if (tablesRef.current) {
+        fadeIn(tablesRef.current, { delay: 0.5 });
+      }
+    };
+
+    // Small delay to ensure DOM is ready
+    const animationTimer = setTimeout(animateElements, 100);
+    return () => clearTimeout(animationTimer);
+  }, [shouldAnimate, shouldUseStagger, connected, isConnected]);
+
+
 
   if (isCheckingConnection || isConnecting) {
     return (
-      <div className="loading-container">
-        <p>Checking wallet connection...</p>
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center p-8">
+          <p>Checking wallet connection...</p>
+        </div>
       </div>
     );
   }
@@ -102,106 +96,44 @@ export default function Dashboard() {
     return null;
   }
 
-  const moveBalance = formatBalance(Number(balance));
-  const usdBalance = movePrice !== null ? moveBalance * movePrice : null;
+
 
   return (
-    <div className="dashboard-container">
-      <div className="dashboard-layout">
-        <div className="main-content">
-          <div className="metrics-section">
-            <div className="metric-card">
-              <div className="metric-header">
-                <FaCoins size={20} />
-                <span>Current Balance</span>
-                <button
-                  className="currency-toggle"
-                  onClick={toggleCurrencyDisplay}
-                  title="Toggle currency display"
-                >
-                  <FaExchangeAlt size={14} />
-                </button>
-              </div>
-              <div className="metric-value">
-                {balanceLoading
-                  ? "Loading..."
-                  : showUSD && usdBalance !== null
-                  ? `$${usdBalance.toFixed(2)} USD`
-                  : `${moveBalance.toFixed(2)} MOVE`}
-              </div>
-              {usdBalance !== null && !showUSD && (
-                <div className="metric-subvalue">
-                  ≈ ${usdBalance.toFixed(2)} USD
-                </div>
-              )}
-              {usdBalance !== null && showUSD && (
-                <div className="metric-subvalue">
-                  ≈ {moveBalance.toFixed(2)} MOVE
-                </div>
-              )}
-            </div>
+    <div ref={containerRef} className="container mx-auto px-4 py-6 max-w-7xl opacity-0">
+      <div className="space-y-8">
+        {/* Top Metrics Grid */}
+        <div ref={metricsRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="metric-card opacity-0"><MoveSupplyCard /></div>
+          <div className="metric-card opacity-0"><CurrentEpochCard /></div>
+          <div className="metric-card opacity-0"><NetworkMetricsCard /></div>
+          <div className="metric-card opacity-0"><StakeMetricsCard /></div>
+        </div>
 
-            <div 
-              className={`metric-card move-balance-risk-card ${moveBalance < LOW_BALANCE_THRESHOLD ? 'low-balance' : ''}`}
-              ref={riskCardRef}
-            >
-              <div className="metric-header">
-                <FaExclamationTriangle size={20} />
-                <span>MOVE Balance Risk</span>
-              </div>
-              <div className="move-balance-progress-row">
-                <div className="move-balance-progress-info">
-                  <div className="progress-header">
-                    <span>{moveBalance.toFixed(2)} / {MAX_BALANCE_FOR_PROGRESS} MOVE</span>
-                    <span className="risk-level">
-                      {moveBalance < LOW_BALANCE_THRESHOLD ? "High Risk" : "Normal"}
-                    </span>
-                  </div>
-                  <div className="progress-container">
-                    <div 
-                      className="progress-bar" 
-                      style={{ width: `${calculateMoveProgress()}%` }}
-                    />
-                    <div 
-                      className="progress-marker"
-                      style={{ left: `${calculateMoveProgress()}%` }}
-                    >
-                      <div className="progress-value">{moveBalance.toFixed(0)} MOVE</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+        {/* Analytics Grid - Consistent 24px spacing */}
+        <div ref={chartsRef} className="grid grid-cols-1 xl:grid-cols-2 gap-6 min-h-[600px] lg:min-h-[700px] xl:min-h-[800px] opacity-0">
+          {/* Left Column: 2 Charts Stacked */}
+          <div className="flex flex-col gap-6 h-full min-h-[600px] lg:min-h-[700px] xl:min-h-[800px]">
+            <div className="flex-1 min-h-[280px] lg:min-h-[320px] xl:min-h-[380px]">
+              <AccountActivityChart />
             </div>
-
-            <div className="metric-card price-card">
-              <div className="metric-header">
-                <FaCoins size={20} />
-                <span>MOVE Price</span>
-              </div>
-              <div className="metric-value price-value">
-                {movePrice !== null ? `$${movePrice.toFixed(4)}` : "Loading..."}
-              </div>
-              {priceChange !== null && (
-                <div
-                  className={`price-change ${
-                    priceChange >= 0 ? "positive" : "negative"
-                  }`}
-                >
-                  {priceChange >= 0 ? (
-                    <FaArrowUp size={18} />
-                  ) : (
-                    <FaArrowDown size={18} />
-                  )}
-                  <span className="change-value">
-                    {Math.abs(priceChange).toFixed(2)}%
-                  </span>
-                  <span className="change-label">24h</span>
-                </div>
-              )}
+            <div className="flex-1 min-h-[280px] lg:min-h-[320px] xl:min-h-[380px]">
+              <NetworkPerformanceChart />
             </div>
           </div>
-          
-          <CallAction/>
+
+          {/* Right Column: DeFi Dashboard (Full Height) */}
+          <div className="h-full min-h-[600px] lg:min-h-[700px] xl:min-h-[800px]">
+            <DeFiDashboard />
+          </div>
+        </div>
+
+        {/* Top Data Tables with Tabs */}
+        <TopDataTabs />
+
+        {/* Tables Grid - Moved Below */}
+        <div ref={tablesRef} className="grid grid-cols-1 lg:grid-cols-2 gap-6 opacity-0">
+          <LatestTransactions limit={5} />
+          <LatestBlocks limit={5} />
         </div>
       </div>
     </div>

@@ -12,7 +12,6 @@ import {
 import { useWallet, useAccount, useAccountBalance } from "@razorlabs/razorkit";
 import QRCode from "react-qr-code";
 import SwapComponent from "./SwapComponent";
-import "./AccountInfoCard.css";
 
 export default function AccountInfoCard({
   show,

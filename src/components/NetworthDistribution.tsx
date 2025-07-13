@@ -1,8 +1,26 @@
 import { useState, useEffect } from 'react';
 import { useAccount } from "@razorlabs/razorkit";
 import { FiChevronDown, FiSearch } from 'react-icons/fi';
-import { PieChart } from '@mui/x-charts/PieChart';
+import { FaCoins, FaChartPie, FaSpinner } from 'react-icons/fa';
+import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import tokenMetadata from './tokenMetadata.json';
+import MovementDataService from '../services/MovementDataService';
+
+// Import design system components
+import {
+  Container,
+  Grid,
+  GridItem,
+  Card,
+  CardHeader,
+  CardBody,
+  Button,
+  Stack,
+  Flex,
+  Responsive,
+  MobileOnly,
+  DesktopUp
+} from "../design-system";
 
 interface TokenMetadata {
   chainId: number;
@@ -120,14 +138,11 @@ const NetworthDistribution = () => {
 
   const fetchMovePrice = async () => {
     try {
-      const response = await fetch(
-        "https://api.coingecko.com/api/v3/simple/price?ids=movement&vs_currencies=usd"
-      );
-      const data = await response.json();
-      return data.movement?.usd || null;
+      const priceData = await MovementDataService.getMovePrice();
+      return priceData.price || null;
     } catch (error) {
       console.error("Error fetching MOVE price:", error);
-      return null;
+      return null; // No fallback price
     }
   };
 
@@ -145,7 +160,11 @@ const NetworthDistribution = () => {
         }
       `;
 
-      const response = await fetch('https://indexer.mainnet.movementnetwork.xyz/v1/graphql', {
+      const graphqlEndpoint = import.meta.env.DEV
+        ? '/api/graphql'
+        : 'https://indexer.mainnet.movementnetwork.xyz/v1/graphql';
+
+      const response = await fetch(graphqlEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -184,7 +203,11 @@ const NetworthDistribution = () => {
         }
       `;
 
-      const response = await fetch('https://indexer.mainnet.movementnetwork.xyz/v1/graphql', {
+      const graphqlEndpoint = import.meta.env.DEV
+        ? '/api/graphql'
+        : 'https://indexer.mainnet.movementnetwork.xyz/v1/graphql';
+
+      const response = await fetch(graphqlEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -404,30 +427,33 @@ const NetworthDistribution = () => {
           
           <div className="pd-chart-container">
             {chartData.length > 0 ? (
-              <PieChart
-                series={[{
-                  data: chartData,
-                  innerRadius: 83,
-                  outerRadius: 130,
-                  paddingAngle: 2,
-                  cornerRadius: 15,
-                  startAngle: -45,
-                  endAngle: 225,
-                  cx: 150,
-                  cy: 150,
-                }]}
-                width={300}
-                height={300}
-              />
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={chartData}
+                    dataKey="value"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={2}
+                    cornerRadius={4}
+                  >
+                    {chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
             ) : (
               <div>No data to display</div>
             )}
             
             <div className="pd-legend">
-              {portfolioData.assets.map((asset, index) => {
-                const count = index === 0 
+              {chartData.map((asset, index) => {
+                const count = asset.label === 'Defi' 
                   ? portfolioData.defiTokens.length 
-                  : index === 1 
+                  : asset.label === 'Tokens' 
                     ? portfolioData.tokens.length 
                     : nftCount;
                 const value = asset.value;
@@ -442,7 +468,7 @@ const NetworthDistribution = () => {
                       style={{ backgroundColor: asset.color }}
                     ></div>
                     <span className="pd-legend-text">
-                      {asset.name} ({asset.name === 'Staked' ? '0%' : percentage})
+                      {asset.label} ({asset.label === 'Staked' ? '0%' : percentage})
                     </span>
                   </div>
                 );
