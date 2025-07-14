@@ -7,6 +7,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Build outputs
 node_modules
 dist
 dist-ssr
@@ -23,3 +24,127 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Cleanup and migration scripts (temporary files)
+cleanup-imports.cjs
+comprehensive-fix.cjs
+disable-broken-components.cjs
+fix-broken-imports.cjs
+fix-components.cjs
+fix-core-components.cjs
+*-fix.cjs
+*-cleanup.cjs
+
+# Disabled components (intentionally disabled)
+*.disabled
+**/*.disabled
+
+# Text files containing unused code
+src/components/*.txt
+src/Walletchecks/*.txt
+**/*.txt.bak
+**/*.txt.old
+
+# Unused/deprecated components
+src/components/Dashboard_migrated.tsx
+src/components/TestLayoutPage.tsx
+
+# Empty directories (add .gitkeep if needed)
+src/context/.gitkeep
+src/lib/utils/.gitkeep
+
+# Test Files
+src/__tests__/*
+
+# Unused Files - Cleanup Scripts (Temporary Migration Tools)
+cleanup-imports.cjs
+comprehensive-fix.cjs
+disable-broken-components.cjs
+fix-broken-imports.cjs
+fix-components.cjs
+fix-core-components.cjs
+
+# Unused Files - Disabled Components
+src/performance/AnimationSystem.tsx.disabled
+src/performance/LazyLoadingSystem.tsx.disabled
+src/performance/PerformanceDashboard.tsx.disabled
+src/performance/PerformanceOptimizer.tsx.disabled
+src/testing/ComponentCompatibilityChecker.tsx.disabled
+src/testing/IntegrationTestingDashboard.tsx.disabled
+src/testing/MigrationTestSuite.tsx.disabled
+src/testing/ResponsiveTestingUtility.tsx.disabled
+
+# Unused Files - Text Files (Backup Code)
+src/components/CollectionTable.txt
+src/components/us.txt
+src/Walletchecks/WalletInventory.txt
+src/Walletchecks/WalletValues.txt
+
+# Unused Files - Components
+# src/components/AdvancedSearch.tsx
+# src/components/ApiDocsPage.tsx
+src/components/AnnouncementBanner.tsx
+# src/components/DeveloperCorner.tsx
+src/components/Dashboard_migrated.tsx
+# src/components/EcosystemLeaderboards.tsx
+src/components/EnhancedTransactionTable.tsx
+# src/components/ExportDataTools.tsx
+src/components/SettingsCard.tsx
+src/components/SubscriptionPlans.tsx
+src/components/TestLayoutPage.tsx
+src/components/ThemeToggle.tsx
+src/components/WalletSelector.tsx
+src/components/DashboardHeader.tsx
+src/components/modern/ModernHeader.tsx
+src/util/Web3Sidebar.tsx
+
+# Unused Files - UI Components
+src/components/ui/badge.tsx
+src/components/ui/mobile-nav.tsx
+src/components/ui/price-card.tsx
+src/components/ui/sheet.tsx
+src/components/ui/sidebar.tsx
+src/components/ui/skeleton.tsx
+src/components/ui/table.tsx
+src/components/ui/theme-provider.tsx
+# src/components/ui/theme-toggle.tsx
+src/components/ui/transaction-card.tsx
+
+# Unused Files - Navigation Components
+src/components/navigation/NavigationAnalytics.tsx
+src/components/navigation/NavigationPreferences.tsx
+src/components/navigation/index.ts
+src/components/layout/NavigationMenu.tsx
+src/components/layout/DropdownNavigationMenu.tsx
+src/components/layout/Breadcrumbs.tsx
+
+# Unused Files - Table Components
+src/components/tables/RecentPackagesTable.tsx
+src/components/tables/TopAccountsTable.tsx
+src/components/tables/TopTokensTable.tsx
+src/components/tables/TopValidatorsTable.tsx
+
+# Unused Files - Library Files
+src/lib/accessibility.ts
+src/lib/performance.ts
+
+# Unused Files - One-time Scripts
+scripts/update-ui-components.ts
+
+# Unused Files - Public Assets
+public/css/
+public/vite.svg
+
+# Temporary and backup files
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
+*.md
+# Analysis and documentation files (keep these tracked)
+!README.md
+!ARCHITECTURE.md
+# !unused-files-list.md
+docs/*.md
+backup/*

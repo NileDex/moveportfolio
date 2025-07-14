@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useAccount } from '@razorlabs/razorkit';
 import { Aptos, Network, AptosConfig } from '@aptos-labs/ts-sdk';
-import { FaSpinner } from 'react-icons/fa';
+import { FaSpinner, FaExternalLinkAlt, FaDownload, FaSearch } from 'react-icons/fa';
+// import '../components/TransactionTable.css'; // Removed - using only Tailwind + shadcn
+
+// Import design system components
+import { Card, CardHeader, CardContent } from '../components/ui/card';
+import { Button } from '../components/ui/button';
 
 interface Transaction {
   version: string;
@@ -29,9 +34,10 @@ export default function WalletTransactions({ walletAddress: propWalletAddress }:
   const [walletAddress] = useState<string>(propWalletAddress || connectedAddress || '');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [exporting, setExporting] = useState(false);
 
   const aptosConfig = new AptosConfig({
-    fullnode: 'https://mainnet.movementnetwork.xyz/v1',
+    fullnode: '/api',
     network: Network.CUSTOM,
   });
   const aptos = new Aptos(aptosConfig);
@@ -62,17 +68,56 @@ export default function WalletTransactions({ walletAddress: propWalletAddress }:
   };
 
   const parseAmount = (amountArg: unknown): string => {
-    if (!amountArg) return '0';
+    if (amountArg === null || typeof amountArg === 'undefined') return '';
     
     try {
       let amount = String(amountArg);
       if (amount.startsWith('0x')) {
         amount = parseInt(amount, 16).toString();
       }
-      return (Number(amount) / 10**8).toFixed(4); // Assuming 8 decimals for MOVE
+      const numericAmount = Number(amount) / 10**8;
+      return isNaN(numericAmount) ? '' : numericAmount.toFixed(4); // Assuming 8 decimals for MOVE
     } catch {
-      return '0';
+      return '';
     }
+  };
+
+  const exportToCsv = () => {
+    if (!transactions.length || exporting) return;
+
+    setExporting(true);
+
+    const worker = new Worker(new URL('../workers/exportWorker.ts', import.meta.url), { type: 'module' });
+
+    worker.onmessage = (e: MessageEvent) => {
+      const { status, csvContent, error } = e.data;
+
+      if (status === 'completed') {
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.href = url;
+        link.setAttribute('download', `transactions_${walletAddress}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } else if (status === 'error') {
+        console.error('Export failed:', error);
+        // Optionally, show an error message to the user
+      }
+
+      setExporting(false);
+      worker.terminate();
+    };
+
+    worker.onerror = (error) => {
+      console.error('Worker error:', error);
+      setExporting(false);
+      worker.terminate();
+    };
+
+    worker.postMessage({ walletAddress });
   };
 
   const formatTimestamp = (timestampMicros: string): string => {
@@ -104,9 +149,10 @@ export default function WalletTransactions({ walletAddress: propWalletAddress }:
     setError(null);
 
     try {
-      // Verify account existence
+      // Verify account existence and get info
+      let accountInfo;
       try {
-        await aptos.getAccountInfo({ accountAddress: walletAddress });
+        accountInfo = await aptos.getAccountInfo({ accountAddress: walletAddress });
       } catch (error) {
         if ((error as { errorCode?: string }).errorCode === 'account_not_found') {
           setTransactions([]);
@@ -115,20 +161,36 @@ export default function WalletTransactions({ walletAddress: propWalletAddress }:
         }
         throw error;
       }
+      
+      const totalTransactions = Number(accountInfo.sequence_number) || 0;
+      if (totalTransactions === 0) {
+        setTransactions([]);
+        setLoading(false);
+        return;
+      }
+      
+      setTotalPages(Math.ceil(totalTransactions / TRANSACTIONS_PER_PAGE));
+
+      // Calculate offset to get latest transactions.
+      const offset = totalTransactions - page * TRANSACTIONS_PER_PAGE;
+
+      const limit = offset < 0 ? TRANSACTIONS_PER_PAGE + offset : TRANSACTIONS_PER_PAGE;
+      const actualOffset = Math.max(0, offset);
+      
+      if (limit <= 0) {
+          setTransactions([]);
+          setLoading(false);
+          return;
+      }
 
       // Fetch transactions
       const accountTransactions = await aptos.getAccountTransactions({
         accountAddress: walletAddress,
         options: {
-          limit: TRANSACTIONS_PER_PAGE,
-          offset: (page - 1) * TRANSACTIONS_PER_PAGE,
+          limit,
+          offset: actualOffset,
         },
       });
-
-      // Calculate total pages
-      const accountInfo = await aptos.getAccountInfo({ accountAddress: walletAddress });
-      const totalTransactions = Number(accountInfo.sequence_number) || 100;
-      setTotalPages(Math.ceil(totalTransactions / TRANSACTIONS_PER_PAGE));
 
       // Process transactions
       const processedTransactions = accountTransactions.map((tx: any) => {
@@ -149,7 +211,8 @@ export default function WalletTransactions({ walletAddress: propWalletAddress }:
         };
       });
 
-      setTransactions(processedTransactions);
+      // The fetched transactions are the latest, but in ascending order. Reverse them.
+      setTransactions(processedTransactions.reverse());
     } catch (error) {
       console.error('Error fetching transactions:', error);
       setError(
@@ -190,103 +253,212 @@ export default function WalletTransactions({ walletAddress: propWalletAddress }:
   };
 
   return (
-    <div className="profiz-transaction-hub">
-      <div className="transactions-container">
-        <div className="transactions-header">
-          <div className="wallet-address-display">
-            {walletAddress ? (
-              <span className="wallet-address">
-                {`${walletAddress.substring(0, 6)}...${walletAddress.substring(walletAddress.length - 4)}`}
-              </span>
-            ) : (
-              <span className="no-wallet">No wallet connected</span>
-            )}
-          </div>
-        </div>
+    <div className="container mx-auto max-w-7xl px-4 py-3">
+      <div className="space-y-6">
+        {/* Header Section */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <h3>Wallet Transactions</h3>
+              <Button
+                onClick={exportTransactions}
+                disabled={!transactions.length || exporting}
+                variant="secondary"
+                className="export-button"
+              >
+                {exporting ? 'Exporting...' : 'Export CSV'}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex justify-between items-center">
+              <div>
+                <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
+                  Connected Wallet:
+                </span>
+                <div style={{
+                  fontSize: 'var(--font-size-base)',
+                  fontWeight: '600',
+                  fontFamily: 'monospace',
+                  color: 'var(--primary-color)'
+                }}>
+                  {walletAddress ? (
+                    `${walletAddress.substring(0, 6)}...${walletAddress.substring(walletAddress.length - 4)}`
+                  ) : (
+                    <span style={{ color: 'var(--text-secondary)' }}>No wallet connected</span>
+                  )}
+                </div>
+              </div>
 
+              <div className="hidden md:block text-sm text-muted-foreground text-right">
+                <div>Total Transactions: {transactions.length}</div>
+                <div>Page {currentPage} of {totalPages}</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Content Section */}
         {loading ? (
-          <div className="transactions-loading">
-            <FaSpinner className="spinner-icon" />
-            <p>Loading transactions...</p>
-          </div>
+          <Card>
+            <CardContent>
+              <div className="flex items-center gap-2">
+                <FaSpinner
+                  style={{
+                    fontSize: '2rem',
+                    color: 'var(--primary-color)',
+                    animation: 'spin 1s linear infinite'
+                  }}
+                />
+                <p style={{ marginTop: '1rem', color: 'var(--text-secondary)' }}>
+                  Loading transactions...
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         ) : error ? (
-          <div className="transactions-error">
-            <p className="error-message">{error}</p>
-            <button className="retry-button" onClick={() => fetchTransactions(currentPage)}>
-              Try Again
-            </button>
-          </div>
+          <Card style={{ borderColor: 'var(--error-color)' }}>
+            <CardContent>
+              <div className="flex items-center gap-2">
+                <p style={{
+                  color: 'var(--error-color)',
+                  fontSize: 'var(--font-size-lg)',
+                  marginBottom: '1rem'
+                }}>
+                  {error}
+                </p>
+                <Button
+                  variant="secondary"
+                  onClick={() => fetchTransactions(currentPage)}
+                >
+                  Try Again
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         ) : transactions.length === 0 ? (
-          <div className="no-transactions">
-            <p>No transactions found for this wallet</p>
-          </div>
+          <Card>
+            <CardContent>
+              <div className="flex items-center gap-2">
+                <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-lg)' }}>
+                  No transactions found for this wallet
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         ) : (
           <>
-            <div className="transactions-table-container">
-              <table className="transactions-table">
-                <thead>
-                  <tr>
-                    <th>Type</th>
-                    <th>Timestamp</th>
-                    <th>From</th>
-                    <th>Status</th>
-                    <th>View</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {transactions.map((tx) => (
-                    <tr key={tx.hash}>
-                      <td>
-                        <div className="tx-type-container">
-                          {getTransactionTypeIcon(tx.type, tx.sender)}
-                          <span className="tx-type">{tx.type}</span>
-                        </div>
-                      </td>
-                      <td>{tx.timestamp}</td>
-                      <td>{truncateAddress(tx.sender)}</td>
-                      <td>
-                        <div className={`status-badge ${tx.status.toLowerCase()}`}>
-                          {tx.status}
-                        </div>
-                      </td>
-                      <td>
-                        <a 
-                          href={`${EXPLORER_BASE_URL}/txn/${tx.hash}?network=mainnet&account=${walletAddress}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="explorer-link"
-                        >
-                          View on Explorer
-                        </a>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {/* Transactions Table */}
+            <Card>
+              <CardContent style={{ padding: 0 }}>
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="transaction-table">
+                    <thead>
+                      <tr>
+                        <th>Type</th>
+                        <th>Timestamp</th>
+                        <th>From</th>
+                        <th>Status</th>
+                        <th>View</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {transactions.map((tx) => (
+                        <tr key={tx.hash}>
+                          <td>
+                            <div className="transaction-type">
+                              <div className={`transaction-type-icon transaction-type-icon--${tx.type.toLowerCase()}`}>
+                                {getTransactionTypeIcon(tx.type, tx.sender)}
+                              </div>
+                              <span>{tx.type}</span>
+                            </div>
+                          </td>
+                          <td>
+                            <span className="transaction-timestamp">{tx.timestamp}</span>
+                          </td>
+                          <td>
+                            <span className="transaction-address">{truncateAddress(tx.sender)}</span>
+                          </td>
+                          <td>
+                            <span className={`transaction-status transaction-status--${tx.status.toLowerCase()}`}>
+                              {tx.status}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="transaction-actions">
+                              <button
+                                className="transaction-action-btn"
+                                onClick={() => window.open(
+                                  `${EXPLORER_BASE_URL}/txn/${tx.hash}?network=mainnet&account=${walletAddress}`,
+                                  '_blank'
+                                )}
+                                title="View on Explorer"
+                              >
+                                <FaExternalLinkAlt />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
 
-            <div className="pagination-controls">
-              <button
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-              >
-                Previous
-              </button>
-              <span>Page {currentPage} of {totalPages}</span>
-              <button
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-              >
-                Next
-              </button>
-              <button
-                onClick={() => handlePageChange(totalPages)}
-                disabled={currentPage === totalPages}
-                className="skip-last"
-              >
-                Skip to Last
-              </button>
-            </div>
+            {/* Pagination */}
+            <Card>
+              <CardContent>
+                <div className="flex justify-between items-center">
+                  <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
+                    Showing {((currentPage - 1) * TRANSACTIONS_PER_PAGE) + 1} to {Math.min(currentPage * TRANSACTIONS_PER_PAGE, transactions.length)} of {transactions.length} transactions
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handlePageChange(1)}
+                      disabled={currentPage === 1}
+                    >
+                      First
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <span style={{
+                      padding: '0 var(--spacing-3)',
+                      fontSize: 'var(--font-size-sm)',
+                      color: 'var(--text-color)',
+                      fontWeight: '600'
+                    }}>
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handlePageChange(totalPages)}
+                      disabled={currentPage === totalPages}
+                    >
+                      Last
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </>
         )}
       </div>

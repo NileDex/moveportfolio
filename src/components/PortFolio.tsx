@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWallet, ConnectModal } from "@razorlabs/razorkit";
 import { FiArrowRight } from 'react-icons/fi';
 import modalillustration from '../assets/modalillustration.webm';
+import { useConditionalAnimation } from '@/contexts/AnimationContext';
+import { fadeIn, slideUp } from '@/lib/animations';
 
 function PortfolioContent() {
   const { connected, account } = useWallet();
@@ -10,12 +12,51 @@ function PortfolioContent() {
   const [isConnecting, setIsConnecting] = useState(false);
   const navigate = useNavigate();
 
+  // Animation refs
+  const heroRef = useRef<HTMLDivElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const subtitleRef = useRef<HTMLParagraphElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  const { shouldAnimate } = useConditionalAnimation();
+
   // Handle successful connection and navigation
   useEffect(() => {
     if (connected && account) {
       navigate('/dashboard');
     }
   }, [connected, account, navigate]);
+
+  // Animation effects
+  useEffect(() => {
+    if (!shouldAnimate) return;
+
+    const animateElements = () => {
+      // Animate hero section
+      if (heroRef.current) {
+        fadeIn(heroRef.current, { delay: 0.1 });
+      }
+
+      // Animate title with slide up
+      if (titleRef.current) {
+        slideUp(titleRef.current, { delay: 0.3 });
+      }
+
+      // Animate subtitle
+      if (subtitleRef.current) {
+        slideUp(subtitleRef.current, { delay: 0.5 });
+      }
+
+      // Animate button
+      if (buttonRef.current) {
+        slideUp(buttonRef.current, { delay: 0.7 });
+      }
+    };
+
+    // Small delay to ensure DOM is ready
+    const animationTimer = setTimeout(animateElements, 100);
+    return () => clearTimeout(animationTimer);
+  }, [shouldAnimate]);
 
   const handleCreatePortfolio = () => {
     if (connected) {
@@ -38,15 +79,15 @@ function PortfolioContent() {
   };
 
   return (
-    <div className="container">
+    <div ref={heroRef} className="portfolio-container opacity-0">
       <div className="content-wrapper">
         {/* Video Logo - Only Changed Element */}
         <div className="logo">
-          <video 
-            autoPlay 
-            loop 
-            muted 
-            playsInline 
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
             className="logo-video"
           >
             <source src={modalillustration} type="video/mp4" />
@@ -56,7 +97,7 @@ function PortfolioContent() {
 
         {/* Original Headline - Unchanged */}
         <div className="headline">
-          <h1>
+          <h1 ref={titleRef} className="opacity-0">
             <span className="text-light">Get deep insights on any wallet,</span>
             <br />
             <span className="text-light">token or dApp on </span>
@@ -67,11 +108,13 @@ function PortfolioContent() {
 
       {/* Original Footer - Unchanged */}
       <div className="footer">
-        <span>Monitor Performance.</span>
-        <span>Identify Alpha.</span>
-        <span>Elevate Your Strategy -</span>
+        <p ref={subtitleRef} className="opacity-0">
+          <span>Monitor Performance.</span>
+          <span>Identify Alpha.</span>
+          <span>Elevate Your Strategy -</span>
+        </p>
         <div className="cta" onClick={handleCreatePortfolio}>
-          <button className="custom-connect-button" disabled={isConnecting}>
+          <button ref={buttonRef} className="custom-connect-button opacity-0" disabled={isConnecting}>
             {isConnecting ? 'Connecting...' : connected ? 'Go to Dashboard' : 'Connect Wallet'}
           </button>
           <FiArrowRight />
